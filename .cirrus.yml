@@ -188,6 +188,52 @@ task:
     FILE_ENV: "./ci/test/00_setup_env_win64.sh"
 
 task:
+  name: 'Win64 [installer]'
+  timeout_in: 120m
+  windows_container:
+    image: cirrusci/windowsservercore:2019
+    cpu: 8
+    memory: 16G
+  env:
+    CIRRUS_WORKING_DIR: "C:\\Windows\\Temp\\bitcoin"
+  install_script:
+    # Install Vistual Studio build tools and other prerequisites
+    - choco upgrade -y visualstudio2019-workload-vctools
+    - choco install -y python3
+  install_vcpkgs_script:
+    # Add vcpkg packages
+    - git clone https://github.com/microsoft/vcpkg
+    - cd vcpkg
+    - git checkout 75522bb1f2e7d863078bcd06322348f053a9e33f
+    - .\bootstrap-vcpkg.bat
+    - .\vcpkg integrate install
+    - .\vcpkg install boost-process:x64-windows-static boost-variant:x64-windows-static boost-signals2:x64-windows-static boost-multi-index:x64-windows-static boost-test:x64-windows-static
+    - .\vcpkg install libevent:x64-windows-static sqlite3:x64-windows-static
+    - .\vcpkg install berkeleydb:x64-windows-static curl:x64-windows-static
+    - .\vcpkg install zeromq:x64-windows-static rapidcheck:x64-windows-static
+  add_qt_script:
+    # Add Qt libraries
+    - choco install -y wget
+    - wget https://github.com/sipsorcery/qt_win_binary/releases/download/qt51210x64_vs2019_1694/Qt5.12.10_x64_static_vs2019_1694.zip
+    - unzip Qt5.12.10_x64_static_vs2019_1694.zip -d c:\Qt5.12.10_x64_static_vs2019_1694
+  build_script:
+    # Build bitcoin
+    - cd c:\Windows\Temp\bitcoin\build_msvc
+    - py msvc-autogen.py
+    - '"c:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\MSBuild\Current\Bin\msbuild" bitcoin.sln'
+  prepare_installer_script:
+    # Install NSIS and prepare msi package
+    - choco install -y nsis
+    - mkdir c:\binaries_windows
+    - cp c:\Windows\Temp\bitcoin\build_msvc\x64\Debug\bitcoind.exe c:\binaries_windows
+    - cp c:\Windows\Temp\bitcoin\build_msvc\x64\Debug\bitcoin-tx.exe c:\binaries_windows
+    - cp c:\Windows\Temp\bitcoin\build_msvc\x64\Debug\bitcoin-qt.exe c:\binaries_windows
+    - cp c:\Windows\Temp\bitcoin\build_msvc\x64\Debug\bitcoin-cli.exe c:\binaries_windows
+    - cp c:\Windows\Temp\bitcoin\build_msvc\x64\Debug\bitcoin-wallet.exe c:\binaries_windows
+    - cd c:\Windows\Temp\bitcoin\share
+    - '"c:\Program Files (x86)\NSIS\makensis.exe" setup-bitcoin-win.nsi'
+
+task:
   name: '32-bit + dash [gui] [CentOS 8]'
   << : *GLOBAL_TASK_TEMPLATE
   container:
